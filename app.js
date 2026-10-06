@@ -1,0 +1,14 @@
+let products=[],cart=JSON.parse(localStorage.getItem("sg_cart")||"[]"),activeCat="";
+const money=n=>Number(n).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+async function load(){let q=new URLSearchParams(location.search).get("q")||"";search.value=q;products=await fetch("/api/products?q="+encodeURIComponent(q)).then(r=>r.json());render()}
+function render(){let list=products.filter(p=>!activeCat||p.category===activeCat);let s=sort.value;if(s==="price")list.sort((a,b)=>a.price-b.price);if(s==="price2")list.sort((a,b)=>b.price-a.price);grid.innerHTML=list.map(p=>`<article class="card"><a href="/produto.html?id=${p.id}" style="text-decoration:none;color:inherit"><div class="photo" ${p.image?`style="background-image:url('${esc(p.image)}')"`:""}>${p.image?"":"✿"}</div><div class="info"><div class="cat">${esc(p.category)}</div><div class="name">${esc(p.name)}</div><div class="rating">★ ${p.rating||5} (${p.reviews||0})</div><div class="price">${money(p.price)}</div><div class="install">Pagamento seguro • envio disponível</div></a><button class="add" onclick="event.stopPropagation();add('${p.id}')">Adicionar ao carrinho</button></div></article>`).join("")}
+function setCat(c){activeCat=c;render()}
+function doSearch(){location.href="/?q="+encodeURIComponent(search.value)}
+function add(id){let x=cart.find(i=>i.id===id);x?x.quantity++:cart.push({id,quantity:1});save();openCart()}
+function save(){localStorage.setItem("sg_cart",JSON.stringify(cart));renderCart()}
+function renderCart(){let t=0;cartItems.innerHTML=cart.map(i=>{let p=products.find(x=>x.id===i.id);if(!p)return"";t+=p.price*i.quantity;return`<div class="cart-row"><div><b>${esc(p.name)}</b><br>${money(p.price)}<br><button onclick="change('${p.id}',-1)">−</button> ${i.quantity} <button onclick="change('${p.id}',1)">+</button></div><b>${money(p.price*i.quantity)}</b></div>`}).join("");total.textContent=money(t);count.textContent=cart.reduce((a,b)=>a+b.quantity,0)}
+function change(id,d){let x=cart.find(i=>i.id===id);if(x){x.quantity+=d;if(x.quantity<=0)cart=cart.filter(i=>i.id!==id)}save()}
+function openCart(){cart.classList.add("open");shade.classList.add("show")}function closeCart(){cart.classList.remove("open");shade.classList.remove("show")}
+cartBtn.onclick=openCart;shade.onclick=closeCart;checkout.onclick=async()=>{if(!cart.length)return alert("Carrinho vazio");checkout.disabled=true;try{let r=await fetch("/api/create-checkout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({items:cart})}),d=await r.json();if(!r.ok)throw Error(d.error);location.href=d.url}catch(e){alert(e.message)}finally{checkout.disabled=false}};
+load();renderCart();
